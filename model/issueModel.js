@@ -78,8 +78,8 @@ module.exports = {
                         'status_idx', status_idx,
                         'startdate', startdate,
                         'completedate', completedate
-                        )) , '[]') from redmanager.workmanage where issue_idx=a.issue_idx) as "workflow" 
-                    from redmanager.issuelist a inner join redmanager.workmanage b 
+                        )) , '[]') from workmanage where issue_idx=a.issue_idx) as "workflow" 
+                    from issuelist a inner join workmanage b 
                     on a.issue_idx = b.issue_idx and a.progress_idx = b.progress_idx `;
       sql += ` where 1=1 and deletedate is null`;
       sql += makeFilteredQuery(data);
@@ -126,7 +126,7 @@ module.exports = {
                       SUM(CASE WHEN result.progress_idx = 5 THEN progresscount ELSE 0 END)::integer as "5",
                       SUM(CASE WHEN result.progress_idx = 6 THEN progresscount ELSE 0 END)::integer as "6",
                       SUM(CASE WHEN result.progress_idx = 7 THEN progresscount ELSE 0 END)::integer as "7"
-                   from (select a.progress_idx, count(*)  as progresscount from redmanager.issuelist a, redmanager.workmanage b  
+                   from (select a.progress_idx, count(*)  as progresscount from issuelist a, workmanage b  
                          where a.issue_idx=b.issue_idx and a.progress_idx=b.progress_idx`;
       sql += makeFilteredQuery(data);
       sql += ` and deletedate is null`;
@@ -156,16 +156,16 @@ module.exports = {
       let sql = ``;
       if (data?.issue_number === undefined || data?.issue_number === "") {
         // 임시 일감 등록
-        sql = `INSERT INTO redmanager.issuelist(issue_subject) values(:issue_subject)  returning issue_idx`;
+        sql = `INSERT INTO issuelist(issue_subject) values(:issue_subject)  returning issue_idx`;
       } else {
         // 기존 레드마인 일감 등록
-        //sql =  `insert into redmanager.issuelist(issue_number, issue_subject, issue_status, issue_assigned_to) values(:issue_number, :issue_subject, :issue_status, :issue_assigned_to)`;
-        sql = `INSERT INTO redmanager.issuelist(issue_number, issue_subject, issue_status, issue_assigned_to, issue_created_on)
+        //sql =  `insert into issuelist(issue_number, issue_subject, issue_status, issue_assigned_to) values(:issue_number, :issue_subject, :issue_status, :issue_assigned_to)`;
+        sql = `INSERT INTO issuelist(issue_number, issue_subject, issue_status, issue_assigned_to, issue_created_on)
                 SELECT :issue_number, :issue_subject, :issue_status, :issue_assigned_to, :issue_created_on 
-                    FROM redmanager.issuelist
+                    FROM issuelist
                     WHERE NOT EXISTS (
                         SELECT 'X' 
-                        FROM redmanager.issuelist
+                        FROM issuelist
                         WHERE 
                             issue_number=:issue_number
                     ) limit 1 returning issue_idx`; // Insert 수행 후 입력된 issue_idx 반환 처리
@@ -175,31 +175,31 @@ module.exports = {
       client.query(mappedSql, function (error, result) {
         if (result.rowCount > 0) {
           var sql =
-            `insert into redmanager.workmanage(issue_idx, progress_idx) values(` +
+            `insert into workmanage(issue_idx, progress_idx) values(` +
             result.rows[0].issue_idx +
             ` ,1);`;
           sql +=
-            `insert into redmanager.workmanage(issue_idx, progress_idx) values(` +
+            `insert into workmanage(issue_idx, progress_idx) values(` +
             result.rows[0].issue_idx +
             `  ,2);`;
           sql +=
-            `insert into redmanager.workmanage(issue_idx, progress_idx) values(` +
+            `insert into workmanage(issue_idx, progress_idx) values(` +
             result.rows[0].issue_idx +
             `  ,3);`;
           sql +=
-            `insert into redmanager.workmanage(issue_idx, progress_idx) values(` +
+            `insert into workmanage(issue_idx, progress_idx) values(` +
             result.rows[0].issue_idx +
             `  ,4);`;
           sql +=
-            `insert into redmanager.workmanage(issue_idx, progress_idx) values(` +
+            `insert into workmanage(issue_idx, progress_idx) values(` +
             result.rows[0].issue_idx +
             `  ,5);`;
           sql +=
-            `insert into redmanager.workmanage(issue_idx, progress_idx) values(` +
+            `insert into workmanage(issue_idx, progress_idx) values(` +
             result.rows[0].issue_idx +
             `  ,6);`;
           sql +=
-            `insert into redmanager.workmanage(issue_idx, progress_idx) values(` +
+            `insert into workmanage(issue_idx, progress_idx) values(` +
             result.rows[0].issue_idx +
             `  ,7);`;
           if (config.getDebugMode()) console.log(sql);
@@ -231,7 +231,7 @@ module.exports = {
                       filter_name,
                       filter_content,
                       isdefaultfilter
-                    from redmanager.savedfilter order by filter_idx `;
+                    from savedfilter order by filter_idx `;
       if (config.getDebugMode()) console.log(sql);
       client.query(sql, function (error, result) {
         release();
@@ -252,7 +252,7 @@ module.exports = {
 
     pool.connect(function (error, client, release) {
       if (error) throw error;
-      let sql = `insert into redmanager.categoryInfo(category_idx, category_name) values((select max(category_idx)+1 from redmanager.categoryinfo), :category_name)`;
+      let sql = `insert into categoryInfo(category_idx, category_name) values((select max(category_idx)+1 from categoryinfo), :category_name)`;
 
       const mappedSql = namedSql(sql)(data);
       if (config.getDebugMode()) console.log(mappedSql);
@@ -274,7 +274,7 @@ module.exports = {
 
     pool.connect(function (error, client, release) {
       if (error) throw error;
-      let sql = `update redmanager.categoryInfo set category_name=:category_name where category_idx = :category_idx`;
+      let sql = `update categoryInfo set category_name=:category_name where category_idx = :category_idx`;
 
       const mappedSql = namedSql(sql)(data);
       if (config.getDebugMode()) console.log(mappedSql);
@@ -297,7 +297,7 @@ module.exports = {
 
     pool.connect(function (error, client, release) {
       if (error) throw error;
-      let sql = `insert into redmanager.savedfilter(filter_name, filter_content, isdefaultfilter) values(:filter_name, :filter_content, '0')`;
+      let sql = `insert into savedfilter(filter_name, filter_content, isdefaultfilter) values(:filter_name, :filter_content, '0')`;
 
       const mappedSql = namedSql(sql)(data);
       if (config.getDebugMode()) console.log(mappedSql);
@@ -320,7 +320,7 @@ module.exports = {
 
     pool.connect(function (error, client, release) {
       if (error) throw error;
-      let sql = `delete from redmanager.savedfilter where filter_idx=$1`;
+      let sql = `delete from savedfilter where filter_idx=$1`;
 
       client.query(sql, [data], function (error, result) {
         release();
@@ -341,14 +341,14 @@ module.exports = {
 
     pool.connect(function (error, client, release) {
       if (error) throw error;
-      let sql = `update redmanager.savedfilter set isdefaultfilter=0`;
+      let sql = `update savedfilter set isdefaultfilter=0`;
       client.query(sql, function (error, result) {
         if (error) {
           console.log(error);
         }
       });
 
-      sql = `update redmanager.savedfilter set isdefaultfilter=:isdefaultfilter where filter_idx=:filter_idx`;
+      sql = `update savedfilter set isdefaultfilter=:isdefaultfilter where filter_idx=:filter_idx`;
 
       const mappedSql = namedSql(sql)(data);
       if (config.getDebugMode()) console.log(mappedSql);
@@ -370,7 +370,7 @@ module.exports = {
 
     pool.connect(function (error, client, release) {
       if (error) throw error;
-      let sql = `UPDATE redmanager.issuelist SET`;
+      let sql = `UPDATE issuelist SET`;
       sql += ` updatedate = now()`;
 
       if (data?.issue_color != undefined) sql += `, issue_color = :issue_color`;
@@ -427,7 +427,7 @@ module.exports = {
                       issue_tag as value, 
                       count(*) as count
                     from 
-                      redmanager.issuelist 
+                      issuelist 
                     where 
                       issue_tag<>'' 
                       and issue_tag is not null 
@@ -456,7 +456,7 @@ module.exports = {
       let sql = `select 
                       category_name  
                     from 
-                      redmanager.categoryInfo 
+                      categoryInfo 
                     order by 
                       category_idx`;
       if (config.getDebugMode()) console.log(sql);
@@ -479,7 +479,7 @@ module.exports = {
 
     pool.connect(function (error, client, release) {
       if (error) throw error;
-      let sql = `UPDATE redmanager.issuelist SET deletedate = now()`;
+      let sql = `UPDATE issuelist SET deletedate = now()`;
       sql += ` WHERE issue_idx = '` + issue_idx + `'`;
       client.query(sql, function (error, result) {
         release();

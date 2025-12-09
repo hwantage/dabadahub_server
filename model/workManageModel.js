@@ -11,7 +11,7 @@ module.exports = {
     });
     pool.connect(function (error, client, release) {
       if (error) throw error;
-      var sql = `UPDATE redmanager.workmanage SET`;
+      var sql = `UPDATE workmanage SET`;
       if (data?.status_idx !== undefined) sql += `  status_idx = :status_idx`;
       if (data?.startdate !== undefined)
         data.startdate === "null"
@@ -29,7 +29,7 @@ module.exports = {
 
       client.query(mappedSql, function (error, result) {
         if (error) console.log(error);
-        var sql2 = `UPDATE redmanager.issuelist SET updatedate = now(), is_updated = false WHERE issue_idx = :issue_idx;`;
+        var sql2 = `UPDATE issuelist SET updatedate = now(), is_updated = false WHERE issue_idx = :issue_idx;`;
         const mappedSql2 = namedSql(sql2)(data);
         if (config.getDebugMode()) console.log(mappedSql2);
         client.query(mappedSql2, function (error, result) {

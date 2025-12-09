@@ -21,7 +21,7 @@ module.exports = {
       if (error) throw error;
       const currentDate = getCurrentDate();
 
-      const sql = `INSERT INTO redmanager.dabada_visitors (date, ip, cnt) VALUES ('${currentDate}', '${ip}', 1) ON CONFLICT (date, ip) DO UPDATE SET cnt = dabada_visitors.cnt + 1`;
+      const sql = `INSERT INTO dabada_visitors (date, ip, cnt) VALUES ('${currentDate}', '${ip}', 1) ON CONFLICT (date, ip) DO UPDATE SET cnt = dabada_visitors.cnt + 1`;
       if (config.getDebugMode()) console.log(sql);
       client.query(sql, function (error, result) {
         release();
@@ -42,7 +42,7 @@ module.exports = {
       // 현재 날짜를 가져옴
       const currentDate = getCurrentDate();
 
-      const sql = `INSERT INTO redmanager.dabada_savedresource (date, ip, action, cnt) VALUES ('${currentDate}', '${ip}', '${action}', 1) ON CONFLICT (date, ip, action) DO UPDATE SET cnt = dabada_savedresource.cnt + 1`;
+      const sql = `INSERT INTO dabada_savedresource (date, ip, action, cnt) VALUES ('${currentDate}', '${ip}', '${action}', 1) ON CONFLICT (date, ip, action) DO UPDATE SET cnt = dabada_savedresource.cnt + 1`;
       if (config.getDebugMode()) console.log(sql);
       client.query(sql, function (error, result) {
         release();
@@ -62,7 +62,7 @@ module.exports = {
       if (error) throw error;
       // 현재 날짜를 가져옴
       const currentDate = getCurrentDate();
-      const sql = `INSERT INTO redmanager.dabada_topurls (date, ip, url, cnt) VALUES ('${currentDate}', '${ip}', '${url}', 1) ON CONFLICT (date, ip, url) DO UPDATE SET cnt = dabada_topurls.cnt + 1`;
+      const sql = `INSERT INTO dabada_topurls (date, ip, url, cnt) VALUES ('${currentDate}', '${ip}', '${url}', 1) ON CONFLICT (date, ip, url) DO UPDATE SET cnt = dabada_topurls.cnt + 1`;
       if (config.getDebugMode()) console.log(sql);
       client.query(sql, function (error, result) {
         release();
@@ -84,16 +84,16 @@ module.exports = {
       if (data.type === "private") {
         sql = `select 
         (select :ip) as myip,
-        (select COALESCE(sum(cnt), 0) from redmanager.dabada_visitors where date = :date and ip = :ip) as visit_cnt,
-        (select count(*) from redmanager.dabada_visitors where date = :date and ip = :ip) as active_cnt,
-        (select COALESCE(sum(cnt), 0) from redmanager.dabada_savedresource where date = :date and action='auth' and ip = :ip) * :authTime as time_cnt_auth,
-        (select COALESCE(sum(cnt), 0) from redmanager.dabada_savedresource where date = :date and action='link' and ip = :ip) * :linkTime as time_cnt_link,
-        (select COALESCE(sum(cnt), 0) from redmanager.dabada_savedresource where date = :date and action='prop' and ip = :ip) * :propTime as time_cnt_prop,
-        (select COALESCE(sum(cnt), 0) from redmanager.dabada_savedresource where date = :date and action='memo' and ip = :ip) * :memoTime as time_cnt_memo,
-        (select COALESCE(sum(cnt), 0) from redmanager.dabada_savedresource where date = :date and action='auth' and ip = :ip) * :authTyping as typing_cnt_auth,
-        (select COALESCE(sum(cnt), 0) from redmanager.dabada_savedresource where date = :date and action='link' and ip = :ip) * :linkTyping as typing_cnt_link,
-        (select COALESCE(sum(cnt), 0) from redmanager.dabada_savedresource where date = :date and action='prop' and ip = :ip) * :propTyping as typing_cnt_prop,
-        (select COALESCE(sum(cnt), 0) from redmanager.dabada_savedresource where date = :date and action='memo' and ip = :ip) * :memoTyping as typing_cnt_memo,
+        (select COALESCE(sum(cnt), 0) from dabada_visitors where date = :date and ip = :ip) as visit_cnt,
+        (select count(*) from dabada_visitors where date = :date and ip = :ip) as active_cnt,
+        (select COALESCE(sum(cnt), 0) from dabada_savedresource where date = :date and action='auth' and ip = :ip) * :authTime as time_cnt_auth,
+        (select COALESCE(sum(cnt), 0) from dabada_savedresource where date = :date and action='link' and ip = :ip) * :linkTime as time_cnt_link,
+        (select COALESCE(sum(cnt), 0) from dabada_savedresource where date = :date and action='prop' and ip = :ip) * :propTime as time_cnt_prop,
+        (select COALESCE(sum(cnt), 0) from dabada_savedresource where date = :date and action='memo' and ip = :ip) * :memoTime as time_cnt_memo,
+        (select COALESCE(sum(cnt), 0) from dabada_savedresource where date = :date and action='auth' and ip = :ip) * :authTyping as typing_cnt_auth,
+        (select COALESCE(sum(cnt), 0) from dabada_savedresource where date = :date and action='link' and ip = :ip) * :linkTyping as typing_cnt_link,
+        (select COALESCE(sum(cnt), 0) from dabada_savedresource where date = :date and action='prop' and ip = :ip) * :propTyping as typing_cnt_prop,
+        (select COALESCE(sum(cnt), 0) from dabada_savedresource where date = :date and action='memo' and ip = :ip) * :memoTyping as typing_cnt_memo,
         (select json_build_object(
                 'date', json_agg(to_char(to_date(a.date, 'YYYYMM'), 'YYYY"년"MM"월"')),
                 'time', json_agg(a.time_cnt),
@@ -112,7 +112,7 @@ module.exports = {
                 SUM(CASE WHEN a.action = 'prop' THEN cnt ELSE 0 END) * :propTyping +
                 SUM(CASE WHEN a.action = 'memo' THEN cnt ELSE 0 END) * :memoTyping  AS typing_cnt
             FROM
-                redmanager.dabada_savedresource a
+                dabada_savedresource a
             WHERE 
                 date <= :date and ip = :ip
             GROUP BY
@@ -128,23 +128,23 @@ module.exports = {
               ))
           from
           (select ROW_NUMBER() OVER (ORDER BY sum(cnt) DESC) as seq, url, sum(cnt) as cnt 
-            from redmanager.dabada_topurls
+            from dabada_topurls
             where date = :date and ip = :ip
             group by date, url order by sum(cnt) desc) a
         ) as topurls`;
       } else {
         sql = `select 
         (select :ip) as myip,
-        (select COALESCE(sum(cnt), 0) from redmanager.dabada_visitors where date = :date) as visit_cnt,
-        (select count(*) from redmanager.dabada_visitors where date = :date) as active_cnt,
-        (select COALESCE(sum(cnt), 0) from redmanager.dabada_savedresource where date = :date and action='auth') * :authTime as time_cnt_auth,
-        (select COALESCE(sum(cnt), 0) from redmanager.dabada_savedresource where date = :date and action='link') * :linkTime as time_cnt_link,
-        (select COALESCE(sum(cnt), 0) from redmanager.dabada_savedresource where date = :date and action='prop') * :propTime as time_cnt_prop,
-        (select COALESCE(sum(cnt), 0) from redmanager.dabada_savedresource where date = :date and action='memo') * :memoTime as time_cnt_memo,
-        (select COALESCE(sum(cnt), 0) from redmanager.dabada_savedresource where date = :date and action='auth') * :authTyping as typing_cnt_auth,
-        (select COALESCE(sum(cnt), 0) from redmanager.dabada_savedresource where date = :date and action='link') * :linkTyping as typing_cnt_link,
-        (select COALESCE(sum(cnt), 0) from redmanager.dabada_savedresource where date = :date and action='prop') * :propTyping as typing_cnt_prop,
-        (select COALESCE(sum(cnt), 0) from redmanager.dabada_savedresource where date = :date and action='memo') * :memoTyping as typing_cnt_memo,
+        (select COALESCE(sum(cnt), 0) from dabada_visitors where date = :date) as visit_cnt,
+        (select count(*) from dabada_visitors where date = :date) as active_cnt,
+        (select COALESCE(sum(cnt), 0) from dabada_savedresource where date = :date and action='auth') * :authTime as time_cnt_auth,
+        (select COALESCE(sum(cnt), 0) from dabada_savedresource where date = :date and action='link') * :linkTime as time_cnt_link,
+        (select COALESCE(sum(cnt), 0) from dabada_savedresource where date = :date and action='prop') * :propTime as time_cnt_prop,
+        (select COALESCE(sum(cnt), 0) from dabada_savedresource where date = :date and action='memo') * :memoTime as time_cnt_memo,
+        (select COALESCE(sum(cnt), 0) from dabada_savedresource where date = :date and action='auth') * :authTyping as typing_cnt_auth,
+        (select COALESCE(sum(cnt), 0) from dabada_savedresource where date = :date and action='link') * :linkTyping as typing_cnt_link,
+        (select COALESCE(sum(cnt), 0) from dabada_savedresource where date = :date and action='prop') * :propTyping as typing_cnt_prop,
+        (select COALESCE(sum(cnt), 0) from dabada_savedresource where date = :date and action='memo') * :memoTyping as typing_cnt_memo,
         (select json_build_object(
                 'date', json_agg(to_char(to_date(a.date, 'YYYYMM'), 'YYYY"년"MM"월"')),
                 'time', json_agg(a.time_cnt),
@@ -163,7 +163,7 @@ module.exports = {
                 SUM(CASE WHEN a.action = 'prop' THEN cnt ELSE 0 END) * :propTyping +
                 SUM(CASE WHEN a.action = 'memo' THEN cnt ELSE 0 END) * :memoTyping  AS typing_cnt
             FROM
-                redmanager.dabada_savedresource a
+                dabada_savedresource a
             WHERE 
                 date <= :date
             GROUP BY
@@ -179,7 +179,7 @@ module.exports = {
               ))
           from
           (select ROW_NUMBER() OVER (ORDER BY sum(cnt) DESC) as seq, url, sum(cnt) as cnt 
-            from redmanager.dabada_topurls
+            from dabada_topurls
             where date = :date
             group by date, url order by sum(cnt) desc) a
         ) as topurls`;

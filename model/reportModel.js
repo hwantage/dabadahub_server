@@ -42,8 +42,8 @@ module.exports = {
                   , COUNT(CASE WHEN status_idx=2 THEN 1 END) AS "진행중"
                   , COUNT(CASE WHEN status_idx=3 THEN 1 END) AS "완료"
                 from 
-                  redmanager.issuelist a
-                  , redmanager.workmanage b 
+                  issuelist a
+                  , workmanage b 
                 where 
                   a.issue_idx=b.issue_idx 
                   and a.progress_idx=b.progress_idx
@@ -87,7 +87,7 @@ module.exports = {
 	        from
 	        (
 	          SELECT to_char(issue_created_on, 'YYYY') || ' ' || CASE WHEN LENGTH(EXTRACT(MONTH FROM issue_created_on)::text)=1 THEN '0' END || EXTRACT(MONTH FROM issue_created_on) || '월' as issue_created_on
-	          FROM generate_series((select issue_created_on from redmanager.issuelist where progress_idx!=1 order by issue_created_on asc limit 1)::timestamp, current_timestamp, '1 days') as issue_created_on  
+	          FROM generate_series((select issue_created_on from issuelist where progress_idx!=1 order by issue_created_on asc limit 1)::timestamp, current_timestamp, '1 days') as issue_created_on  
 	          group by to_char(issue_created_on, 'YYYY') || ' ' || CASE WHEN LENGTH(EXTRACT(MONTH FROM issue_created_on)::text)=1 THEN '0' END || EXTRACT(month FROM issue_created_on) || '월'
 	        ) as series
 	        left outer join
@@ -96,7 +96,7 @@ module.exports = {
 	            to_char(issue_created_on, 'YYYY') || ' ' || CASE WHEN LENGTH(EXTRACT(MONTH FROM issue_created_on)::text)=1 THEN '0' END || EXTRACT(MONTH FROM issue_created_on) || '월' as issue_created_on,
 	            COUNT(*) AS count
 	          FROM
-	            redmanager.issuelist as a
+	            issuelist as a
 	          WHERE
 	            progress_idx!=1
 	          GROUP BY to_char(issue_created_on, 'YYYY'), extract(month from issue_created_on)
@@ -110,7 +110,7 @@ module.exports = {
           from
           (
             SELECT to_char(issue_created_on, 'YYYY') || ' ' || EXTRACT(QUARTER FROM issue_created_on) || 'Q' as issue_created_on
-            FROM generate_series((select issue_created_on from redmanager.issuelist where progress_idx!=1 order by issue_created_on asc limit 1)::timestamp, current_timestamp, '1 days') as issue_created_on  
+            FROM generate_series((select issue_created_on from issuelist where progress_idx!=1 order by issue_created_on asc limit 1)::timestamp, current_timestamp, '1 days') as issue_created_on  
             group by to_char(issue_created_on, 'YYYY') || ' ' || EXTRACT(QUARTER FROM issue_created_on) || 'Q'
           ) as series
           left outer join
@@ -119,7 +119,7 @@ module.exports = {
               to_char(issue_created_on, 'YYYY') || ' ' || EXTRACT(QUARTER FROM issue_created_on) || 'Q' as issue_created_on,
               COUNT(*) AS count
             FROM
-              redmanager.issuelist as a
+              issuelist as a
             WHERE
               progress_idx!=1
             GROUP BY to_char(issue_created_on, 'YYYY'), extract(quarter from issue_created_on)
@@ -133,7 +133,7 @@ module.exports = {
             from
             (
               SELECT to_char(issue_created_on, 'YYYY') || '년' as issue_created_on
-              FROM generate_series((select issue_created_on from redmanager.issuelist where progress_idx!=1 order by issue_created_on asc limit 1)::timestamp, current_timestamp, '1 days') as issue_created_on  
+              FROM generate_series((select issue_created_on from issuelist where progress_idx!=1 order by issue_created_on asc limit 1)::timestamp, current_timestamp, '1 days') as issue_created_on  
               group by to_char(issue_created_on, 'YYYY') || '년'
             ) as series
             left outer join
@@ -142,7 +142,7 @@ module.exports = {
                 to_char(issue_created_on, 'YYYY') || '년' as issue_created_on,
                 COUNT(*) AS count
               FROM
-                redmanager.issuelist as a
+                issuelist as a
               WHERE
                 progress_idx!=1
               GROUP BY to_char(issue_created_on, 'YYYY'), extract(year from issue_created_on)
@@ -190,7 +190,7 @@ module.exports = {
       dateRangeCondition = `and issue_created_on between :startDate::timestamp and :endDate::timestamp`;
     }
     if (data.dateType === "all") {
-      seriesCondition = `(select issue_created_on from redmanager.issuelist where progress_idx!=1 order by issue_created_on asc limit 1)::timestamp, current_timestamp, '1 days'`;
+      seriesCondition = `(select issue_created_on from issuelist where progress_idx!=1 order by issue_created_on asc limit 1)::timestamp, current_timestamp, '1 days'`;
       dateRangeCondition = ` `;
     }
 
@@ -218,7 +218,7 @@ module.exports = {
         `,
             COUNT(*) AS count
           FROM 
-            redmanager.issuelist as a
+            issuelist as a
           WHERE 
             progress_idx!=1
             and deletedate is null
@@ -272,7 +272,7 @@ module.exports = {
                 to_char(completedate, 'YYYY') || ' ' || extract(quarter from completedate) || 'Q' as completedate,
                 COUNT(*) AS count
               FROM 
-                redmanager.workmanage as a
+                workmanage as a
               WHERE 
                 progress_idx=5
                 and completedate between '2021-01-01'::timestamp and '2022-03-31'::timestamp
@@ -326,7 +326,7 @@ module.exports = {
       dateRangeCondition = `and completedate between :startDate::timestamp and :endDate::timestamp`;
     }
     if (data.dateType === "all") {
-      seriesCondition = `(select issue_created_on from redmanager.issuelist where progress_idx!=1 order by issue_created_on asc limit 1)::timestamp, current_timestamp, '1 days'`;
+      seriesCondition = `(select issue_created_on from issuelist where progress_idx!=1 order by issue_created_on asc limit 1)::timestamp, current_timestamp, '1 days'`;
       dateRangeCondition = ` `;
     }
 
@@ -354,7 +354,7 @@ module.exports = {
         `,
             COUNT(*) AS count
           FROM 
-            redmanager.issuelist as a, redmanager.workmanage as b
+            issuelist as a, workmanage as b
           WHERE 
             a.issue_idx=b.issue_idx
             and a.deletedate is null
@@ -404,7 +404,7 @@ module.exports = {
           priority_idx,
           issue_created_on
          FROM 
-          redmanager.issuelist
+          issuelist
          WHERE 
           issue_created_on <= current_timestamp + '-12 month' 
           and progress_idx !=1 
@@ -438,8 +438,8 @@ module.exports = {
       let sql = `SELECT
                     a.progress_idx, count(*)
                 from 
-                    redmanager.issuelist a, 
-                    redmanager.workmanage b
+                    issuelist a, 
+                    workmanage b
                 where a.issue_idx=b.issue_idx
                     and a.progress_idx=b.progress_idx
                     and a.progress_idx!=1
@@ -478,7 +478,7 @@ module.exports = {
         (
           -- 개발 완료까지 평균 소요 시간 (일감 등록 일시 부터 개발 완료까지)
           select avg(b.completedate::date-a.issue_created_on::date)::int as interval
-          from redmanager.issuelist a, redmanager.workmanage b
+          from issuelist a, workmanage b
           where a.issue_idx=b.issue_idx
             and a.priority_idx  =  ANY(:priority_idx)
             and a.deletedate is null
@@ -491,7 +491,7 @@ module.exports = {
         -- 개발 완료 median
           select PERCENTILE_CONT(0.5) WITHIN GROUP(ORDER BY resultSet.interval)::int as median FROM (
             select (b.completedate::date-a.issue_created_on::date)::int as interval
-            from redmanager.issuelist a, redmanager.workmanage b
+            from issuelist a, workmanage b
             where a.issue_idx=b.issue_idx
               and a.priority_idx  =  ANY(:priority_idx)  
               and a.deletedate is null
@@ -506,8 +506,8 @@ module.exports = {
           select avg(completedate::date-qastartdate::date)::int as interval
           from 
           (
-            select (select startdate from redmanager.workmanage where issue_idx=b.issue_idx and progress_idx=6) as qaStartDate, completedate
-            from redmanager.issuelist a, redmanager.workmanage b
+            select (select startdate from workmanage where issue_idx=b.issue_idx and progress_idx=6) as qaStartDate, completedate
+            from issuelist a, workmanage b
             where a.issue_idx=b.issue_idx
               and a.priority_idx  =  ANY(:priority_idx)
               and a.deletedate is null
@@ -523,8 +523,8 @@ module.exports = {
             select (completedate::date-qastartdate::date)::int as interval
             from 
             (
-              select (select startdate from redmanager.workmanage where issue_idx=b.issue_idx and progress_idx=6) as qaStartDate, completedate
-              from redmanager.issuelist a, redmanager.workmanage b
+              select (select startdate from workmanage where issue_idx=b.issue_idx and progress_idx=6) as qaStartDate, completedate
+              from issuelist a, workmanage b
               where a.issue_idx=b.issue_idx
                 and a.priority_idx  =  ANY(:priority_idx)
                 and a.deletedate is null
