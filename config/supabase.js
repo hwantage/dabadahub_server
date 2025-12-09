@@ -6,7 +6,7 @@ if (process.env.NODE_ENV !== "production") {
 
 const { createClient } = require("@supabase/supabase-js");
 
-const supabaseUrl = process.env.SUPABASE_URL || "https://mquahiwmjkxikfkpkahl.supabase.co";
+const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_ANON_KEY || "";
 
 // 서버 환경에서는 localStorage가 없으므로 세션 저장 비활성화
@@ -19,7 +19,7 @@ const supabase = createClient(supabaseUrl, supabaseKey, {
 });
 
 // Storage bucket name
-const BUCKET_NAME = "dabadahub";
+const BUCKET_NAME = process.env.SUPABASE_BUCKET_NAME;
 
 module.exports = {
   supabase,

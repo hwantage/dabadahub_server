@@ -11,14 +11,14 @@ module.exports = {
 
   // 레드마인 Host url
   getHost: function () {
-    return "http://redmine.somansa.com/redmine";
+    return "http://redmine.xxx.com/redmine";
   },
 
   // 레드마인 Admin Account
   getAccount: function () {
     const account = {
-      username: "kvirus",
-      password: "sms980502!",
+      username: "",
+      password: "",
     };
     return account;
   },
@@ -26,15 +26,14 @@ module.exports = {
   // 레드마인 Admin Account
   getCreaterAccount: function () {
     const account = {
-      username: "hwan77",
-      password: "tnflstkfkd1!",
+      username: "",
+      password: "",
     };
     return account;
   },
 
   // 이미지 업로드 Path
   getUploadPath: function () {
-    //return "/redmanager/views/public/upload/";
     return "/redmanager/views/build/upload/";
   },
 };
