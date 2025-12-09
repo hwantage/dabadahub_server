@@ -34,6 +34,6 @@ module.exports = {
 
   // 이미지 업로드 Path
   getUploadPath: function () {
-    return "/redmanager/views/build/upload/";
+    return "/redmanager/upload/";
   },
 };
