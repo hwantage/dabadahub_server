@@ -17,8 +17,8 @@ module.exports = {
   // 레드마인 Admin Account
   getAccount: function () {
     const account = {
-      username: "",
-      password: "",
+      username: "x",
+      password: "x",
     };
     return account;
   },
@@ -26,8 +26,8 @@ module.exports = {
   // 레드마인 Admin Account
   getCreaterAccount: function () {
     const account = {
-      username: "",
-      password: "",
+      username: "x",
+      password: "x",
     };
     return account;
   },
