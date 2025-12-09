@@ -1,7 +1,7 @@
 const config = require("../config/baseconfig");
 const issueModel = require("../model/issueModel");
-const fs = require("fs");
-const fsPromises = require("fs").promises;
+const { supabase, BUCKET_NAME } = require("../config/supabase");
+
 module.exports = {
   getIssueList: function (req, res) {
     let data = JSON.parse(req.query[0]);
@@ -94,121 +94,151 @@ module.exports = {
     });
   },
 
-  getFileList: function (req, res) {
-    const uploadPath = config.getUploadPath() + req.params.data + "/";
-
-    fs.readdir(uploadPath, function (error, filelist) {
-      res.send(JSON.stringify(filelist));
-    });
-  },
-
-  fileDelete: function (req, res) {
-    let data = JSON.parse(req.query[0]);
-    const uploadPath = config.getUploadPath() + data.issue_idx + "/";
-    let result = "success";
-    let resultMessage = "File is deleted";
+  // Supabase Storage를 이용한 파일 목록 조회
+  getFileList: async function (req, res) {
+    const folderPath = `issues/${req.params.data}`;
 
     try {
-      fs.unlinkSync(uploadPath + data.fileName, { recursive: false });
-    } catch (err) {
-      console.error(err);
-      result = "fail";
-      resultMessage = "File not exist.";
-    }
+      const { data, error } = await supabase.storage
+        .from(BUCKET_NAME)
+        .list(folderPath);
 
-    res.send({
-      status: result,
-      message: resultMessage,
-      data: {
-        name: data.fileName,
-        issue_idx: data.issue_idx,
-      },
-    });
+      if (error) {
+        console.error("파일 목록 조회 오류:", error);
+        return res.send(JSON.stringify([]));
+      }
+
+      // 파일 이름만 추출
+      const fileList = data
+        .filter((item) => item.name !== ".emptyFolderPlaceholder")
+        .map((item) => item.name);
+
+      res.send(JSON.stringify(fileList));
+    } catch (err) {
+      console.error("파일 목록 조회 중 오류:", err);
+      res.send(JSON.stringify([]));
+    }
   },
-  // 파일 삭제 함수를 Promise로 변환합니다.
-  unlinkFile: function (filePath) {
-    return fsPromises
-      .unlink(filePath)
-      .then(() => {
-        console.log("파일 삭제 완료 : ", filePath);
-      })
-      .catch((err) => {
-        console.error("파일 삭제 중 오류 발생:", err);
-        throw err; // 에러를 다시 던져서 상위 함수에서 처리할 수 있도록 합니다.
+
+  // Supabase Storage를 이용한 파일 삭제
+  fileDelete: async function (req, res) {
+    let data = JSON.parse(req.query[0]);
+    const filePath = `issues/${data.issue_idx}/${data.fileName}`;
+
+    try {
+      const { error } = await supabase.storage
+        .from(BUCKET_NAME)
+        .remove([filePath]);
+
+      if (error) {
+        console.error("파일 삭제 오류:", error);
+        return res.send({
+          status: "fail",
+          message: error.message,
+          data: {
+            name: data.fileName,
+            issue_idx: data.issue_idx,
+          },
+        });
+      }
+
+      console.log("파일 삭제 완료:", filePath);
+      res.send({
+        status: "success",
+        message: "File is deleted",
+        data: {
+          name: data.fileName,
+          issue_idx: data.issue_idx,
+        },
       });
+    } catch (err) {
+      console.error("파일 삭제 중 오류:", err);
+      res.send({
+        status: "fail",
+        message: err.message,
+        data: {
+          name: data.fileName,
+          issue_idx: data.issue_idx,
+        },
+      });
+    }
   },
-  fileUpload: function (req, res) {
+
+  // Supabase Storage를 이용한 파일 업로드
+  fileUpload: async function (req, res) {
     console.log("파일 업로드를 시작합니다.", req.body.issue_idx);
     console.log("파일 업로드를 시작합니다. overwrite", req.body.overwrite);
+
     if (!req.files || Object.keys(req.files).length === 0) {
       return res.status(400).send("No files were uploaded.");
     }
-    // The name of the input field (i.e. "sampleFile") is used to retrieve the uploaded file
-    let file = req.files.file;
-    const uploadPath = config.getUploadPath() + req.body.issue_idx + "/";
 
-    // 디렉토리 생성
-    fs.mkdirSync(uploadPath, { recursive: true });
+    const file = req.files.file;
     let fileName = file.name;
-    if (typeof req.body.overwrite === "undefined") {
-      // 파일 이름 중복 확인
-      let flag = true;
-      let count = 0;
+    const folderPath = `issues/${req.body.issue_idx}`;
 
-      while (flag) {
-        if (fs.existsSync(uploadPath + fileName)) {
-          count++;
-          fileName = count + "_" + file.name;
-        } else {
-          flag = false;
+    try {
+      // overwrite가 없을 경우 파일명 중복 체크
+      if (typeof req.body.overwrite === "undefined") {
+        const { data: existingFiles } = await supabase.storage
+          .from(BUCKET_NAME)
+          .list(folderPath);
+
+        if (existingFiles) {
+          const existingNames = existingFiles.map((f) => f.name);
+          let count = 0;
+          let originalName = fileName;
+
+          while (existingNames.includes(fileName)) {
+            count++;
+            fileName = `${count}_${originalName}`;
+          }
         }
       }
-      // Use the mv() method to place the file somewhere on your server
-      file.mv(uploadPath + fileName, function (err) {
-        if (err) {
-          console.log(err);
-          return res.status(500).send(err);
-        }
-        console.log("파일 업로드 완료 : ", uploadPath + fileName);
-        console.log(fileName, file.mimetype, file.size, req.body.issue_idx);
-        res.send({
-          status: true,
-          message: "File is uploaded",
-          data: {
-            fileName: fileName,
-            mimetype: file.mimetype,
-            size: file.size,
-            issue_idx: req.body.issue_idx,
-          },
+
+      const filePath = `${folderPath}/${fileName}`;
+
+      // Supabase Storage에 업로드
+      const { data, error } = await supabase.storage
+        .from(BUCKET_NAME)
+        .upload(filePath, file.data, {
+          contentType: file.mimetype,
+          upsert: req.body.overwrite ? true : false,
         });
+
+      if (error) {
+        console.error("파일 업로드 오류:", error);
+        return res.status(500).send({
+          status: false,
+          message: error.message,
+        });
+      }
+
+      // 공개 URL 가져오기
+      const {
+        data: { publicUrl },
+      } = supabase.storage.from(BUCKET_NAME).getPublicUrl(filePath);
+
+      console.log("파일 업로드 완료:", filePath);
+      console.log(fileName, file.mimetype, file.size, req.body.issue_idx);
+
+      res.send({
+        status: true,
+        message: "File is uploaded",
+        data: {
+          fileName: fileName,
+          mimetype: file.mimetype,
+          size: file.size,
+          issue_idx: req.body.issue_idx,
+          url: publicUrl,
+        },
       });
-    } else {
-      this.unlinkFile(uploadPath + fileName)
-        .then(() => {
-          console.log("파일 업데이트를 위해 삭제 : ", uploadPath + fileName);
-          // Use the mv() method to place the file somewhere on your server
-          file.mv(uploadPath + fileName, function (err) {
-            if (err) {
-              console.log(err);
-              return res.status(500).send(err);
-            }
-            console.log("파일 업로드 완료 : ", uploadPath + fileName);
-            console.log(fileName, file.mimetype, file.size, req.body.issue_idx);
-            res.send({
-              status: true,
-              message: "File is uploaded",
-              data: {
-                fileName: fileName,
-                mimetype: file.mimetype,
-                size: file.size,
-                issue_idx: req.body.issue_idx,
-              },
-            });
-          });
-        })
-        .catch((err) => {
-          res.status(500).send(err);
-        });
+    } catch (err) {
+      console.error("파일 업로드 중 오류:", err);
+      res.status(500).send({
+        status: false,
+        message: err.message,
+      });
     }
   },
 };

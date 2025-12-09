@@ -6,7 +6,7 @@ const issueService = require("./service/issueService");
 const reportService = require("./service/reportService");
 const workManageService = require("./service/workManageService");
 const dabadahubService = require("./service/dabadahubService");
-const fs = require("fs");
+const { supabase, BUCKET_NAME } = require("./config/supabase");
 const app = express();
 
 app.use(fileUpload());
@@ -22,41 +22,130 @@ const logger = function (req, res, next) {
   next();
 };
 
-// 이미지 다운로드
-app.get("/getImage/:fileName", (req, res) => {
-  const fileName = req.params.fileName;
-  const filePath = `${fileName}`; // 이미지 파일이 저장된 경로
+// API 목록 조회 (루트 경로)
+app.get("/", (req, res) => {
+  const apiList = {
+    name: "RedManager API Server",
+    version: "1.0.0",
+    endpoints: {
+      "Redmine": [
+        { method: "GET", path: "/redmine", description: "레드마인 이슈 목록 조회" },
+        { method: "GET", path: "/getRedmineIssueById/:id", description: "레드마인 이슈 상세 조회" },
+        { method: "GET", path: "/getRedmineProjectList", description: "레드마인 프로젝트 목록 조회" },
+        { method: "GET", path: "/getRedmineUserList", description: "레드마인 유저 목록 조회" },
+        { method: "POST", path: "/createRedmineIssue", description: "레드마인 이슈 생성" },
+        { method: "GET", path: "/syncAllIssue/", description: "전체 이슈 동기화" },
+      ],
+      "Issue": [
+        { method: "POST", path: "/getIssueList/", description: "이슈 목록 조회" },
+        { method: "POST", path: "/getIssueListCount/", description: "이슈 카운트 조회" },
+        { method: "GET", path: "/addRegistedIssue/:data", description: "등록된 이슈 추가" },
+        { method: "GET", path: "/addIssueByData/:data", description: "데이터로 이슈 추가" },
+        { method: "POST", path: "/addNewIssue/", description: "새 이슈 추가" },
+        { method: "POST", path: "/updateIssue/", description: "이슈 수정" },
+        { method: "GET", path: "/deleteIssue/:issue_idx", description: "이슈 삭제" },
+      ],
+      "Workflow": [
+        { method: "POST", path: "/updateWorkflowData/", description: "워크플로우 데이터 수정" },
+      ],
+      "Filter": [
+        { method: "POST", path: "/addSavedFilter/", description: "필터 저장" },
+        { method: "GET", path: "/getSavedFilterList/", description: "저장된 필터 목록 조회" },
+        { method: "GET", path: "/deleteSavedFilter/:data", description: "저장된 필터 삭제" },
+        { method: "GET", path: "/updateDefaultFilter/:data", description: "기본 필터 설정" },
+      ],
+      "Category & Tag": [
+        { method: "POST", path: "/addCategory/", description: "카테고리 추가" },
+        { method: "POST", path: "/updateCategory/", description: "카테고리 수정" },
+        { method: "GET", path: "/getTagList/", description: "태그 목록 조회" },
+        { method: "GET", path: "/getCategoryList/", description: "카테고리 목록 조회" },
+      ],
+      "File": [
+        { method: "GET", path: "/getImage/:issueIdx/:fileName", description: "이미지 다운로드 (Supabase)" },
+        { method: "GET", path: "/getImageUrl/:issueIdx/:fileName", description: "이미지 공개 URL 조회 (Supabase)" },
+        { method: "POST", path: "/fileUpload/", description: "파일 업로드 (Supabase)" },
+        { method: "POST", path: "/fileDelete/", description: "파일 삭제 (Supabase)" },
+        { method: "GET", path: "/getFileList/:data", description: "파일 목록 조회 (Supabase)" },
+      ],
+      "Report": [
+        { method: "GET", path: "/getReportSummary/:data", description: "리포트 요약 조회" },
+        { method: "GET", path: "/getReportTrendSummary/:data", description: "리포트 트렌드 요약 조회" },
+        { method: "GET", path: "/getReportTrendSummaryComplete/:data", description: "리포트 트렌드 완료 요약 조회" },
+        { method: "GET", path: "/get1YearIssue/:data", description: "1년 이상 미완료 일감 조회" },
+        { method: "GET", path: "/get90DaysOverIssue/:data", description: "90일 이상 장기 일감 조회" },
+        { method: "GET", path: "/getAverageTime/:data", description: "평균 소요 시간 조회" },
+      ],
+      "Dabadahub": [
+        { method: "GET", path: "/getDabadahubConfig/", description: "다바다허브 설정 조회" },
+        { method: "POST", path: "/saveDabadahubConfig/", description: "다바다허브 설정 저장" },
+        { method: "POST", path: "/saveLink/", description: "링크 저장" },
+        { method: "GET", path: "/getLinkList/", description: "링크 목록 조회" },
+        { method: "POST", path: "/saveMemo/", description: "메모 저장" },
+        { method: "GET", path: "/getMemoList/", description: "메모 목록 조회" },
+        { method: "POST", path: "/actionCountor/", description: "통계 저장" },
+        { method: "GET", path: "/getStatistics/:data", description: "통계 조회" },
+        { method: "GET", path: "/checkLinkAvailability", description: "링크 가용성 체크" },
+      ],
+    },
+  };
+  res.json(apiList);
+});
 
-  // 파일을 읽어서 클라이언트에게 전송
-  fs.readFile(filePath, (err, data) => {
-    if (err) {
-      console.error("Error reading image file:", err);
-      res.status(500).send("Internal Server Error");
-      return;
+// 이미지 다운로드 (Supabase Storage)
+app.get("/getImage/:issueIdx/:fileName", async (req, res) => {
+  const { issueIdx, fileName } = req.params;
+  const filePath = `issues/${issueIdx}/${fileName}`;
+
+  try {
+    // Supabase Storage에서 파일 다운로드
+    const { data, error } = await supabase.storage
+      .from(BUCKET_NAME)
+      .download(filePath);
+
+    if (error) {
+      console.error("Error downloading image file:", error);
+      return res.status(404).send("File not found");
     }
-    // 파일의 확장자를 추출
-    let contentType = "image/jpeg"; // 기본적으로 JPEG로 설정
+
+    // 파일의 확장자를 추출하여 Content-Type 설정
     const extension = fileName.split(".").pop().toLowerCase();
+    let contentType = "application/octet-stream";
+
     switch (extension) {
       case "jpg":
       case "jpeg":
         contentType = "image/jpeg";
+        break;
       case "png":
         contentType = "image/png";
+        break;
       case "gif":
         contentType = "image/gif";
+        break;
       case "webp":
-        contentType = "image/webp";
       case "webp2":
         contentType = "image/webp";
-      default:
-        contentType = "application/octet-stream";
+        break;
     }
 
-    // 이미지 파일인 경우 적절한 MIME 타입을 설정하여 전송
+    // Blob을 Buffer로 변환하여 전송
+    const buffer = Buffer.from(await data.arrayBuffer());
     res.writeHead(200, { "Content-Type": contentType });
-    res.end(data);
-  });
+    res.end(buffer);
+  } catch (err) {
+    console.error("Error reading image file:", err);
+    res.status(500).send("Internal Server Error");
+  }
+});
+
+// 이미지 공개 URL 조회 (Supabase Storage)
+app.get("/getImageUrl/:issueIdx/:fileName", (req, res) => {
+  const { issueIdx, fileName } = req.params;
+  const filePath = `issues/${issueIdx}/${fileName}`;
+
+  const { data } = supabase.storage.from(BUCKET_NAME).getPublicUrl(filePath);
+
+  res.json({ url: data.publicUrl });
 });
 
 // 레드마인 조회(Using Redmine Rest API)
