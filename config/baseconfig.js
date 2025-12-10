@@ -14,29 +14,6 @@ module.exports = {
     return "pg";
   },
 
-  // 레드마인 Host url
-  getHost: function () {
-    return "http://redmine.xxx.com/redmine";
-  },
-
-  // 레드마인 Admin Account
-  getAccount: function () {
-    const account = {
-      username: "x",
-      password: "x",
-    };
-    return account;
-  },
-
-  // 레드마인 Admin Account
-  getCreaterAccount: function () {
-    const account = {
-      username: "x",
-      password: "x",
-    };
-    return account;
-  },
-
   // Supabase Storage bucket 내 업로드 경로
   getUploadPath: function () {
     return "redmanager/upload/";

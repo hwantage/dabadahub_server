@@ -1,7 +1,6 @@
 const express = require("express");
 const fileUpload = require("express-fileupload");
 const cors = require("cors");
-const redmineService = require("./service/redmineService");
 const issueService = require("./service/issueService");
 const reportService = require("./service/reportService");
 const workManageService = require("./service/workManageService");
@@ -25,17 +24,9 @@ const logger = function (req, res, next) {
 // API 목록 조회 (루트 경로)
 app.get("/", (req, res) => {
   const apiList = {
-    name: "RedManager API Server",
+    name: "Dabadahub API Server",
     version: "1.0.0",
     endpoints: {
-      "Redmine": [
-        { method: "GET", path: "/redmine", description: "레드마인 이슈 목록 조회" },
-        { method: "GET", path: "/getRedmineIssueById/:id", description: "레드마인 이슈 상세 조회" },
-        { method: "GET", path: "/getRedmineProjectList", description: "레드마인 프로젝트 목록 조회" },
-        { method: "GET", path: "/getRedmineUserList", description: "레드마인 유저 목록 조회" },
-        { method: "POST", path: "/createRedmineIssue", description: "레드마인 이슈 생성" },
-        { method: "GET", path: "/syncAllIssue/", description: "전체 이슈 동기화" },
-      ],
       "Issue": [
         { method: "POST", path: "/getIssueList/", description: "이슈 목록 조회" },
         { method: "POST", path: "/getIssueListCount/", description: "이슈 카운트 조회" },
@@ -148,27 +139,6 @@ app.get("/getImageUrl/:issueIdx/:fileName", (req, res) => {
   res.json({ url: data.publicUrl });
 });
 
-// 레드마인 조회(Using Redmine Rest API)
-app.get("/redmine", logger, (req, res) => {
-  redmineService.getRedmineIssueList(req, res);
-});
-
-app.get("/getRedmineIssueById/:id", logger, (req, res) => {
-  redmineService.getRedmineIssueById(req, res);
-});
-
-app.get("/getRedmineProjectList", logger, (req, res) => {
-  redmineService.getRedmineProjectList(req, res);
-});
-
-app.get("/getRedmineUserList", logger, (req, res) => {
-  redmineService.getRedmineUserList(req, res);
-});
-
-app.post("/createRedmineIssue", logger, (req, res) => {
-  redmineService.createRedmineIssue(req, res);
-});
-
 // 관리 대상 이슈 목록 조회 (From Database)
 app.post("/getIssueList/", logger, (req, res) => {
   issueService.getIssueList(req, res);
@@ -240,11 +210,6 @@ app.get("/getTagList/", logger, (req, res) => {
 // 카테고리 목록 조회
 app.get("/getCategoryList/", logger, (req, res) => {
   issueService.getCategoryList(req, res);
-});
-
-// 전체 동기화
-app.get("/syncAllIssue/", logger, logger, (req, res) => {
-  redmineService.syncAllIssue(req, res);
 });
 
 // 파일 업로드
