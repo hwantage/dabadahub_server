@@ -1,6 +1,6 @@
 const Redmine = require("node-redmine");
-const fs = require("fs");
 const config = require("../config/baseconfig");
+const { supabase, BUCKET_NAME } = require("../config/supabase");
 
 const redmine = new Redmine(config.getHost(), config.getAccount());
 const createredmine = new Redmine(config.getHost(), config.getCreaterAccount());
@@ -48,86 +48,83 @@ module.exports = {
       }
     };
   */
-  createRedmineIssue: function (issue, callback) {
-    /*
-    var dummyresult = {
-      issue: {
-        id: 179267,
-        project: {
-          id: 151,
-          name: "DLP+ Center 2.0 (2014-03)",
-        },
-        tracker: {
-          id: 4,
-          name: "기능요청",
-        },
-        status: {
-          id: 1,
-          name: "신규",
-        },
-        priority: {
-          id: 2,
-          name: "보통",
-        },
-        author: {
-          id: 233,
-          name: "강병균",
-        },
-        assigned_to: {
-          id: 183,
-          name: "김정환",
-        },
-        subject: "test",
-        description: "test\r\n\r\n실험",
-        start_date: "2022-09-16",
-        due_date: "2022-09-16",
-        done_ratio: 10,
-        is_private: false,
-        estimated_hours: null,
-        total_estimated_hours: null,
-        custom_fields: [
-          {
-            id: 5,
-            name: "관계자",
-            multiple: true,
-            value: [],
-          },
-          {
-            id: 6,
-            name: "개발담당",
-            value: null,
-          },
-        ],
-        created_on: "2022-09-16T10:03:10Z",
-        updated_on: "2022-09-16T10:03:10Z",
-        closed_on: null,
-      },
-    };
-    //callback(dummyresult);
-    */
-
-    // /upload/redmine 폴더에 업로드 되어 있는 파일을 레드마인에 업로드
+  createRedmineIssue: async function (issue, callback) {
     const uploadPath = config.getUploadPath() + "redmine/";
     let uploadedFiles = [];
 
-    fs.readdir(uploadPath, function (error, filelist) {
-      let fcount = filelist.length;
+    try {
+      // Supabase Storage에서 파일 목록 조회
+      const { data: fileList, error: listError } = await supabase.storage
+        .from(BUCKET_NAME)
+        .list(uploadPath);
 
-      if (fcount > 0) {
-        filelist.forEach((fileName) => {
-          const content = fs.readFileSync(uploadPath + fileName);
+      if (listError) {
+        console.error("파일 목록 조회 오류:", listError);
+        // 오류가 있어도 이슈 생성은 진행
+        createredmine.create_issue(issue, function (err, data) {
+          if (err) {
+            console.log(err);
+            callback(err);
+          } else {
+            console.log(data);
+            callback(data);
+          }
+        });
+        return;
+      }
+
+      // 실제 파일만 필터링 (폴더나 placeholder 제외)
+      const files = (fileList || []).filter(
+        (item) => item.name && item.name !== ".emptyFolderPlaceholder"
+      );
+
+      if (files.length > 0) {
+        let fcount = files.length;
+
+        for (const file of files) {
+          const filePath = `${uploadPath}${file.name}`;
+
+          // Supabase Storage에서 파일 다운로드
+          const { data: fileData, error: downloadError } = await supabase.storage
+            .from(BUCKET_NAME)
+            .download(filePath);
+
+          if (downloadError) {
+            console.error("파일 다운로드 오류:", downloadError);
+            fcount--;
+            continue;
+          }
+
+          // Blob을 Buffer로 변환
+          const arrayBuffer = await fileData.arrayBuffer();
+          const content = Buffer.from(arrayBuffer);
+
+          // Redmine에 파일 업로드
           createredmine.upload(content, function (err, data) {
-            if (err) console.log(err);
+            if (err) {
+              console.log(err);
+              fcount--;
+              return;
+            }
+
             uploadedFiles.push({
               token: data.upload.token,
-              filename: fileName,
+              filename: file.name,
             });
 
-            fs.unlinkSync(uploadPath + fileName, { recursive: false }); // 업로드 완료된 파일 삭제
+            // Supabase Storage에서 파일 삭제
+            supabase.storage
+              .from(BUCKET_NAME)
+              .remove([filePath])
+              .then(({ error: deleteError }) => {
+                if (deleteError) {
+                  console.error("파일 삭제 오류:", deleteError);
+                }
+              });
 
             // 마지막 파일이 업로드되면 create_issue 메소드 호출
             if (--fcount === 0) {
-              issue = { issue: { ...issue.issue, uploads: uploadedFiles } }; // 업로드할 json 에 파일 목록 추가
+              issue = { issue: { ...issue.issue, uploads: uploadedFiles } };
 
               createredmine.create_issue(issue, function (err, data) {
                 if (err) {
@@ -140,8 +137,9 @@ module.exports = {
               });
             }
           });
-        });
+        }
       } else {
+        // 업로드할 파일이 없으면 바로 이슈 생성
         createredmine.create_issue(issue, function (err, data) {
           if (err) {
             console.log(err);
@@ -152,7 +150,10 @@ module.exports = {
           }
         });
       }
-    });
+    } catch (err) {
+      console.error("이슈 생성 중 오류:", err);
+      callback(err);
+    }
   },
 
   // 삭제 기능은 UI에서 구현하지 않았음.
@@ -245,61 +246,3 @@ const getUsers = function (offset, mergedData, callback) {
     }
   );
 };
-/*****************/
-/*redmine API 호출 리스트*/
-/*****************/
-/*
-issues //이슈리스트
-get_issue_by_id // 이슈 id로 찾기
-create_issue // 이슈 생성
-update_issue // 이슈 수정
-delete_issue // 이수 삭제
-add_watcher // 감시자 추가
-remove_watcher // 감시자 삭제
-projects // 프로젝트 리스트
-get_project_by_id //프로젝트 id로 찾기
-create_project // 프로젝트 생성
-update_project //프로젝트 수정
-delete_project //프로젝트 삭제
-users //사용자 리스트
-get_user_by_id // 사용자 아이디로 찾기
-current_user // 뭔지모름
-create_user // 유저생성
-update_user //유저 수정
-delete_user //유저 삭제
-
-등등.. 자세한 정보는
-D:\redManager\redManager\server\node_modules\node-redmine\lib\redmine.js 참조
-
-{
-    issue: {
-      id: 161616,
-      project: { id: 55, name: '[QA2Team]' },
-      tracker: { id: 5, name: '시험요청' },
-      status: { id: 9, name: '배포준비중' },
-      priority: { id: 2, name: '보통' },
-      author: { id: 153, name: '박중환' },
-      assigned_to: { id: 372, name: '김연효' },
-      fixed_version: { id: 254, name: 'Privacy-i 6.0' },
-      subject: '[P6.0][KB카드] USB Mobile 예외요청 API 개발 요청의 건. ',
-      description: '*1. 제품/버젼(빌드버젼또는수정날짜) :* P6.0\r\n' ',
-      start_date: '2019-12-23',
-      due_date: '2020-01-31',
-      done_ratio: 100,
-      spent_hours: 0,
-      custom_fields: [
-        [Object], [Object],
-        [Object], [Object],
-        [Object], [Object],
-        [Object], [Object],
-        [Object], [Object],
-        [Object], [Object],
-        [Object], [Object],
-        [Object], [Object]
-      ],
-      created_on: '2020-01-22T06:48:37Z',
-      updated_on: '2020-05-08T08:31:51Z'
-    }
-  }
-
-*/

@@ -1,9 +1,47 @@
 const axios = require("axios");
 const https = require("https");
-const fs = require("fs");
-const path = require("path");
 const config = require("../config/baseconfig");
 const dabadahubModel = require("../model/dabadahubModel");
+const { supabase, BUCKET_NAME } = require("../config/supabase");
+
+// Supabase Storage 헬퍼 함수
+const storageHelper = {
+  // 파일 읽기 (JSON)
+  async readJsonFile(filePath) {
+    const { data, error } = await supabase.storage
+      .from(BUCKET_NAME)
+      .download(filePath);
+
+    if (error) {
+      if (error.message.includes("not found") || error.message.includes("Object not found")) {
+        return null; // 파일이 없으면 null 반환
+      }
+      throw error;
+    }
+
+    const text = await data.text();
+    return JSON.parse(text);
+  },
+
+  // 파일 쓰기 (JSON)
+  async writeJsonFile(filePath, jsonData) {
+    const content = JSON.stringify(jsonData, null, 2);
+    const blob = new Blob([content], { type: "application/json" });
+
+    const { error } = await supabase.storage
+      .from(BUCKET_NAME)
+      .upload(filePath, blob, {
+        contentType: "application/json",
+        upsert: true, // 파일이 있으면 덮어쓰기
+      });
+
+    if (error) {
+      throw error;
+    }
+
+    return true;
+  },
+};
 
 module.exports = {
   /* 다바다허브 API */
@@ -39,83 +77,61 @@ module.exports = {
   },
 
   // 다바다허브 기본 환경 설정 조회
-  getDabadahubConfig: function (req, res) {
+  getDabadahubConfig: async function (req, res) {
     console.log(req.connection.remoteAddress);
     const uploadPath = config.getUploadPath();
     const ip = req.connection.remoteAddress;
     console.log("Client IP:", ip);
-    const data = [];
-    const filePath = path.join(uploadPath, `dabadahub.config.json`);
-    fs.readFile(filePath, "utf8", (err, fileData) => {
-      if (err) {
-        if (err.code === "ENOENT") {
-          fileData = "[]";
-        } else {
-          console.error(err);
-          return res.status(500).send(err);
-        }
+
+    const filePath = `${uploadPath}dabadahub.config.json`;
+
+    try {
+      let configData = await storageHelper.readJsonFile(filePath);
+
+      if (configData === null) {
+        configData = [];
       }
 
-      let configData;
-      try {
-        configData = JSON.parse(fileData);
-
-        dabadahubModel.dbCountorVisitors(ip); // 방문자수 업데이트
-        //db.close();
-      } catch (parseErr) {
-        console.error(parseErr);
-        return res.status(500).send(parseErr);
-      }
-
+      dabadahubModel.dbCountorVisitors(ip); // 방문자수 업데이트
       res.status(200).send(configData);
-    });
+    } catch (err) {
+      console.error(err);
+      res.status(500).send(err.message);
+    }
   },
 
   // 다바다허브 환경 설정 저장
-  saveDabadahubConfig: function (req, res) {
+  saveDabadahubConfig: async function (req, res) {
     const uploadPath = config.getUploadPath();
     const data = JSON.parse(req.query[0]);
 
-    const filePath = path.join(uploadPath, `dabadahub.config.json`);
+    const filePath = `${uploadPath}dabadahub.config.json`;
 
     if (data.password !== "skfdkfkuxrlghlrxla") {
       return res.status(200).send("invalid password");
     }
-    let configData;
-    // 파일 읽기
-    fs.readFile(filePath, "utf8", (err, fileData) => {
-      try {
-        // JSON 데이터 파싱
-        configData = {
-          ...data,
-          category: JSON.parse(data.category),
-          autoKeyword: JSON.parse(data.autoKeyword),
-          statistics: JSON.parse(data.statistics),
-        };
-      } catch (parseErr) {
-        // JSON 파싱 오류 발생시 서버 오류 응답
-        console.error(parseErr);
-        return res.status(500).send(parseErr);
-      }
+
+    try {
+      // JSON 데이터 파싱
+      const configData = {
+        ...data,
+        category: JSON.parse(data.category),
+        autoKeyword: JSON.parse(data.autoKeyword),
+        statistics: JSON.parse(data.statistics),
+      };
       delete configData.password;
-      // 파일 쓰기
-      fs.writeFile(
-        filePath,
-        JSON.stringify(configData, null, 2),
-        "utf8",
-        (writeErr) => {
-          if (writeErr) {
-            console.error(writeErr);
-            return res.status(500).send(writeErr);
-          }
-          res.status(200).send("success");
-        }
-      );
-    });
+
+      // Supabase Storage에 파일 쓰기
+      await storageHelper.writeJsonFile(filePath, configData);
+      res.status(200).send("success");
+    } catch (err) {
+      console.error(err);
+      res.status(500).send(err.message);
+    }
   },
 
   // 링크 저장, 수정, 삭제
-  saveLink: function (req, res) {
+  saveLink: async function (req, res) {
     const uploadPath = config.getUploadPath();
     const data = JSON.parse(req.query[0]);
 
@@ -131,29 +147,14 @@ module.exports = {
       linkimage: '링크 확인 이미지', // optional
     } 
     */
-    const filePath = path.join(uploadPath, `dabadahub.json`);
+    const filePath = `${uploadPath}dabadahub.json`;
 
-    // 파일 읽기
-    fs.readFile(filePath, "utf8", (err, fileData) => {
-      if (err) {
-        if (err.code === "ENOENT") {
-          // 파일이 없으면 빈 배열로 시작
-          fileData = "[]";
-        } else {
-          // 그 외의 오류 발생시 서버 오류 응답
-          console.error(err);
-          return res.status(500).send(err);
-        }
-      }
+    try {
+      // 파일 읽기
+      let linkData = await storageHelper.readJsonFile(filePath);
 
-      let linkData;
-      try {
-        // JSON 데이터 파싱
-        linkData = JSON.parse(fileData);
-      } catch (parseErr) {
-        // JSON 파싱 오류 발생시 서버 오류 응답
-        console.error(parseErr);
-        return res.status(500).send(parseErr);
+      if (linkData === null) {
+        linkData = [];
       }
 
       if (data.isDelete) {
@@ -207,55 +208,36 @@ module.exports = {
         linkData.push(data);
       }
 
-      // 파일 쓰기
-      fs.writeFile(
-        filePath,
-        JSON.stringify(linkData, null, 2),
-        "utf8",
-        (writeErr) => {
-          if (writeErr) {
-            console.error(writeErr);
-            return res.status(500).send(writeErr);
-          }
-          res.status(200).send("success");
-        }
-      );
-    });
+      // Supabase Storage에 파일 쓰기
+      await storageHelper.writeJsonFile(filePath, linkData);
+      res.status(200).send("success");
+    } catch (err) {
+      console.error(err);
+      res.status(500).send(err.message);
+    }
   },
 
   // 링크 목록 조회
-  getLinkList: function (req, res) {
+  getLinkList: async function (req, res) {
     const uploadPath = config.getUploadPath();
-    const data = [];
-    const filePath = path.join(uploadPath, `dabadahub.json`);
-    fs.readFile(filePath, "utf8", (err, fileData) => {
-      if (err) {
-        if (err.code === "ENOENT") {
-          // 파일이 없으면 빈 배열로 시작
-          fileData = "[]";
-        } else {
-          // 그 외의 오류 발생시 서버 오류 응답
-          console.error(err);
-          return res.status(500).send(err);
-        }
-      }
+    const filePath = `${uploadPath}dabadahub.json`;
 
-      let linkData;
-      try {
-        // JSON 데이터 파싱
-        linkData = JSON.parse(fileData);
-      } catch (parseErr) {
-        // JSON 파싱 오류 발생시 서버 오류 응답
-        console.error(parseErr);
-        return res.status(500).send(parseErr);
+    try {
+      let linkData = await storageHelper.readJsonFile(filePath);
+
+      if (linkData === null) {
+        linkData = [];
       }
 
       res.status(200).send(linkData);
-    });
+    } catch (err) {
+      console.error(err);
+      res.status(500).send(err.message);
+    }
   },
 
   // 메모 저장, 수정, 삭제
-  saveMemo: function (req, res) {
+  saveMemo: async function (req, res) {
     const uploadPath = config.getUploadPath();
     const data = JSON.parse(req.query[0]);
 
@@ -269,29 +251,14 @@ module.exports = {
       datetime: '등록시간', // 필수
     } 
     */
-    const filePath = path.join(uploadPath, `dabadahub.memo.json`);
+    const filePath = `${uploadPath}dabadahub.memo.json`;
 
-    // 파일 읽기
-    fs.readFile(filePath, "utf8", (err, fileData) => {
-      if (err) {
-        if (err.code === "ENOENT") {
-          // 파일이 없으면 빈 배열로 시작
-          fileData = "[]";
-        } else {
-          // 그 외의 오류 발생시 서버 오류 응답
-          console.error(err);
-          return res.status(500).send(err);
-        }
-      }
+    try {
+      // 파일 읽기
+      let memoData = await storageHelper.readJsonFile(filePath);
 
-      let memoData;
-      try {
-        // JSON 데이터 파싱
-        memoData = JSON.parse(fileData);
-      } catch (parseErr) {
-        // JSON 파싱 오류 발생시 서버 오류 응답
-        console.error(parseErr);
-        return res.status(500).send(parseErr);
+      if (memoData === null) {
+        memoData = [];
       }
 
       if (data.isDelete) {
@@ -313,74 +280,55 @@ module.exports = {
         memoData.push(data);
       }
 
-      // 파일 쓰기
-      fs.writeFile(
-        filePath,
-        JSON.stringify(memoData, null, 2),
-        "utf8",
-        (writeErr) => {
-          if (writeErr) {
-            console.error(writeErr);
-            return res.status(500).send(writeErr);
-          }
-          const ip = req.connection.remoteAddress;
-          !data.isDelete && dabadahubModel.dbCountorSavedresource(ip, "memo");
-          res.status(200).send("success");
-        }
-      );
-    });
+      // Supabase Storage에 파일 쓰기
+      await storageHelper.writeJsonFile(filePath, memoData);
+
+      const ip = req.connection.remoteAddress;
+      !data.isDelete && dabadahubModel.dbCountorSavedresource(ip, "memo");
+      res.status(200).send("success");
+    } catch (err) {
+      console.error(err);
+      res.status(500).send(err.message);
+    }
   },
 
   // 메모 목록 조회
-  getMemoList: function (req, res) {
+  getMemoList: async function (req, res) {
     const uploadPath = config.getUploadPath();
-    const data = [];
-    const filePath = path.join(uploadPath, `dabadahub.memo.json`);
-    fs.readFile(filePath, "utf8", (err, fileData) => {
-      if (err) {
-        if (err.code === "ENOENT") {
-          // 파일이 없으면 빈 배열로 시작
-          fileData = "[]";
-        } else {
-          // 그 외의 오류 발생시 서버 오류 응답
-          console.error(err);
-          return res.status(500).send(err);
-        }
-      }
+    const filePath = `${uploadPath}dabadahub.memo.json`;
 
-      let memoData;
-      try {
-        // JSON 데이터 파싱
-        memoData = JSON.parse(fileData);
-      } catch (parseErr) {
-        // JSON 파싱 오류 발생시 서버 오류 응답
-        console.error(parseErr);
-        return res.status(500).send(parseErr);
+    try {
+      let memoData = await storageHelper.readJsonFile(filePath);
+
+      if (memoData === null) {
+        memoData = [];
       }
 
       // 현재 시간
       const currentTime = new Date();
 
       // datetime 값이 3시간 이상 차이나는 데이터 제거
-      memoData = memoData.filter((memo) => {
+      const filteredMemoData = memoData.filter((memo) => {
         const memoTime = new Date(memo.datetime);
         const timeDifference = (currentTime - memoTime) / (1000 * 60 * 60); // 시간으로 변환
         return timeDifference <= 3 || !memo.autoDelete; // 3시간 이내의 데이터만 유지
       });
 
-      // 수정된 데이터를 파일에 다시 저장
-      fs.writeFile(filePath, JSON.stringify(memoData), "utf8", (writeErr) => {
-        if (writeErr) {
-          console.error(writeErr);
-          return res.status(500).send(writeErr);
-        }
+      // 필터링된 데이터가 원본과 다르면 저장
+      if (filteredMemoData.length !== memoData.length) {
+        await storageHelper.writeJsonFile(filePath, filteredMemoData);
+      }
 
-        memoData.sort((a, b) => {
-          return new Date(b.datetime) - new Date(a.datetime);
-        });
-        res.status(200).send(memoData);
+      // 정렬
+      filteredMemoData.sort((a, b) => {
+        return new Date(b.datetime) - new Date(a.datetime);
       });
-    });
+
+      res.status(200).send(filteredMemoData);
+    } catch (err) {
+      console.error(err);
+      res.status(500).send(err.message);
+    }
   },
 
   actionCountor: function (req, res) {
@@ -395,67 +343,60 @@ module.exports = {
     const ip = req.connection.remoteAddress;
     dabadahubModel.dbCountorSavedresource(ip, data.action);
     if (data.action === "link") dabadahubModel.dbCountorTopurls(ip, data.url);
+    res.status(200).send("success");
   },
 
-  getStatistics: function (req, res) {
+  getStatistics: async function (req, res) {
     let data = JSON.parse(req.params.data);
     const ip = req.connection.remoteAddress;
     data = { ...data, ip: ip };
 
     // config 파일에서 점수 계산 기준 조회
     const uploadPath = config.getUploadPath();
+    const filePath = `${uploadPath}dabadahub.config.json`;
 
-    const filePath = path.join(uploadPath, `dabadahub.config.json`);
-    fs.readFile(filePath, "utf8", (err, fileData) => {
-      if (err) {
-        if (err.code === "ENOENT") {
-          fileData = "[]";
-        } else {
-          console.error(err);
-          return res.status(500).send(err);
+    try {
+      let configData = await storageHelper.readJsonFile(filePath);
+
+      if (configData === null) {
+        configData = { statistics: [] };
+      }
+
+      for (const item of configData.statistics || []) {
+        if (item.action === "link") {
+          data = {
+            ...data,
+            linkTime: item.value.time,
+            linkTyping: item.value.typing,
+          };
+        } else if (item.action === "auth") {
+          data = {
+            ...data,
+            authTime: item.value.time,
+            authTyping: item.value.typing,
+          };
+        } else if (item.action === "prop") {
+          data = {
+            ...data,
+            propTime: item.value.time,
+            propTyping: item.value.typing,
+          };
+        } else if (item.action === "memo") {
+          data = {
+            ...data,
+            memoTime: item.value.time,
+            memoTyping: item.value.typing,
+          };
         }
       }
 
-      let configData;
-      try {
-        configData = JSON.parse(fileData);
-
-        for (const item of configData.statistics) {
-          if (item.action === "link") {
-            data = {
-              ...data,
-              linkTime: item.value.time,
-              linkTyping: item.value.typing,
-            };
-          } else if (item.action === "auth") {
-            data = {
-              ...data,
-              authTime: item.value.time,
-              authTyping: item.value.typing,
-            };
-          } else if (item.action === "prop") {
-            data = {
-              ...data,
-              propTime: item.value.time,
-              propTyping: item.value.typing,
-            };
-          } else if (item.action === "memo") {
-            data = {
-              ...data,
-              memoTime: item.value.time,
-              memoTyping: item.value.typing,
-            };
-          }
-        }
-
-        dabadahubModel.getStatistics(data, (rows) => {
-          console.log(rows);
-          res.send(JSON.stringify(rows));
-        });
-      } catch (parseErr) {
-        console.error(parseErr);
-        return res.status(500).send(parseErr);
-      }
-    });
+      dabadahubModel.getStatistics(data, (rows) => {
+        console.log(rows);
+        res.send(JSON.stringify(rows));
+      });
+    } catch (err) {
+      console.error(err);
+      res.status(500).send(err.message);
+    }
   },
 };
