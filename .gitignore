@@ -35,3 +35,5 @@ uploads/
 .vercel/
 
 conn_test_supabase_pg.js
+
+.bkit

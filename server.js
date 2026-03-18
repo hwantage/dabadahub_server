@@ -66,6 +66,9 @@ app.get("/", (req, res) => {
         { method: "GET", path: "/get90DaysOverIssue/:data", description: "90일 이상 장기 일감 조회" },
         { method: "GET", path: "/getAverageTime/:data", description: "평균 소요 시간 조회" },
       ],
+      "Server": [
+        { method: "GET", path: "/getServerTime/", description: "서버 시간 조회 (Unix ms)" },
+      ],
       "Dabadahub": [
         { method: "GET", path: "/getDabadahubConfig/", description: "다바다허브 설정 조회" },
         { method: "POST", path: "/saveDabadahubConfig/", description: "다바다허브 설정 저장" },
@@ -80,6 +83,11 @@ app.get("/", (req, res) => {
     },
   };
   res.json(apiList);
+});
+
+// 서버 시간 조회
+app.get("/getServerTime/", (req, res) => {
+  res.json({ timestamp: Date.now() });
 });
 
 // 이미지 다운로드 (Supabase Storage)

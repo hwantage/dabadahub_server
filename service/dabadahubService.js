@@ -118,6 +118,7 @@ module.exports = {
         category: JSON.parse(data.category),
         autoKeyword: JSON.parse(data.autoKeyword),
         statistics: JSON.parse(data.statistics),
+        otpSites: JSON.parse(data.otpSites)
       };
       delete configData.password;
 
