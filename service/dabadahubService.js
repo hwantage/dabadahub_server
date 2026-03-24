@@ -388,6 +388,12 @@ module.exports = {
             memoTime: item.value.time,
             memoTyping: item.value.typing,
           };
+        } else if (item.action === "otp") {
+          data = {
+            ...data,
+            otpTime: item.value.time,
+            otpTyping: item.value.typing,
+          };
         }
       }
 

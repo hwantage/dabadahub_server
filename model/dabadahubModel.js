@@ -89,10 +89,12 @@ module.exports = {
         (select COALESCE(sum(cnt), 0) from dabada_savedresource where date = :date and action='auth' and ip = :ip) * :authTime as time_cnt_auth,
         (select COALESCE(sum(cnt), 0) from dabada_savedresource where date = :date and action='link' and ip = :ip) * :linkTime as time_cnt_link,
         (select COALESCE(sum(cnt), 0) from dabada_savedresource where date = :date and action='prop' and ip = :ip) * :propTime as time_cnt_prop,
+        (select COALESCE(sum(cnt), 0) from dabada_savedresource where date = :date and action='otp' and ip = :ip) * :otpTime as time_cnt_otp,
         (select COALESCE(sum(cnt), 0) from dabada_savedresource where date = :date and action='memo' and ip = :ip) * :memoTime as time_cnt_memo,
         (select COALESCE(sum(cnt), 0) from dabada_savedresource where date = :date and action='auth' and ip = :ip) * :authTyping as typing_cnt_auth,
         (select COALESCE(sum(cnt), 0) from dabada_savedresource where date = :date and action='link' and ip = :ip) * :linkTyping as typing_cnt_link,
         (select COALESCE(sum(cnt), 0) from dabada_savedresource where date = :date and action='prop' and ip = :ip) * :propTyping as typing_cnt_prop,
+        (select COALESCE(sum(cnt), 0) from dabada_savedresource where date = :date and action='otp' and ip = :ip) * :propTyping as typing_cnt_opt,
         (select COALESCE(sum(cnt), 0) from dabada_savedresource where date = :date and action='memo' and ip = :ip) * :memoTyping as typing_cnt_memo,
         (select json_build_object(
                 'date', json_agg(to_char(to_date(a.date, 'YYYYMM'), 'YYYY"년"MM"월"')),
@@ -106,10 +108,12 @@ module.exports = {
                 SUM(CASE WHEN a.action = 'link' THEN cnt ELSE 0 END) * :linkTime +
                 SUM(CASE WHEN a.action = 'auth' THEN cnt ELSE 0 END) * :authTime +
                 SUM(CASE WHEN a.action = 'prop' THEN cnt ELSE 0 END) * :propTime +
+                SUM(CASE WHEN a.action = 'otp' THEN cnt ELSE 0 END) * :otpTime +
                 SUM(CASE WHEN a.action = 'memo' THEN cnt ELSE 0 END) * :memoTime AS time_cnt,
                 SUM(CASE WHEN a.action = 'link' THEN cnt ELSE 0 END) * :linkTyping +
                 SUM(CASE WHEN a.action = 'auth' THEN cnt ELSE 0 END) * :authTyping +
                 SUM(CASE WHEN a.action = 'prop' THEN cnt ELSE 0 END) * :propTyping +
+                SUM(CASE WHEN a.action = 'otp' THEN cnt ELSE 0 END) * :otpTyping +
                 SUM(CASE WHEN a.action = 'memo' THEN cnt ELSE 0 END) * :memoTyping  AS typing_cnt
             FROM
                 dabada_savedresource a
@@ -140,10 +144,12 @@ module.exports = {
         (select COALESCE(sum(cnt), 0) from dabada_savedresource where date = :date and action='auth') * :authTime as time_cnt_auth,
         (select COALESCE(sum(cnt), 0) from dabada_savedresource where date = :date and action='link') * :linkTime as time_cnt_link,
         (select COALESCE(sum(cnt), 0) from dabada_savedresource where date = :date and action='prop') * :propTime as time_cnt_prop,
+        (select COALESCE(sum(cnt), 0) from dabada_savedresource where date = :date and action='otp') * :otpTime as time_cnt_otp,
         (select COALESCE(sum(cnt), 0) from dabada_savedresource where date = :date and action='memo') * :memoTime as time_cnt_memo,
         (select COALESCE(sum(cnt), 0) from dabada_savedresource where date = :date and action='auth') * :authTyping as typing_cnt_auth,
         (select COALESCE(sum(cnt), 0) from dabada_savedresource where date = :date and action='link') * :linkTyping as typing_cnt_link,
         (select COALESCE(sum(cnt), 0) from dabada_savedresource where date = :date and action='prop') * :propTyping as typing_cnt_prop,
+        (select COALESCE(sum(cnt), 0) from dabada_savedresource where date = :date and action='otp') * :otpTyping as typing_cnt_otp,
         (select COALESCE(sum(cnt), 0) from dabada_savedresource where date = :date and action='memo') * :memoTyping as typing_cnt_memo,
         (select json_build_object(
                 'date', json_agg(to_char(to_date(a.date, 'YYYYMM'), 'YYYY"년"MM"월"')),
@@ -157,10 +163,12 @@ module.exports = {
                 SUM(CASE WHEN a.action = 'link' THEN cnt ELSE 0 END) * :linkTime +
                 SUM(CASE WHEN a.action = 'auth' THEN cnt ELSE 0 END) * :authTime +
                 SUM(CASE WHEN a.action = 'prop' THEN cnt ELSE 0 END) * :propTime +
+                SUM(CASE WHEN a.action = 'otp' THEN cnt ELSE 0 END) * :otpTime +
                 SUM(CASE WHEN a.action = 'memo' THEN cnt ELSE 0 END) * :memoTime AS time_cnt,
                 SUM(CASE WHEN a.action = 'link' THEN cnt ELSE 0 END) * :linkTyping +
                 SUM(CASE WHEN a.action = 'auth' THEN cnt ELSE 0 END) * :authTyping +
                 SUM(CASE WHEN a.action = 'prop' THEN cnt ELSE 0 END) * :propTyping +
+                SUM(CASE WHEN a.action = 'otp' THEN cnt ELSE 0 END) * :otpTyping +
                 SUM(CASE WHEN a.action = 'memo' THEN cnt ELSE 0 END) * :memoTyping  AS typing_cnt
             FROM
                 dabada_savedresource a
