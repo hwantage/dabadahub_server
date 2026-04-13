@@ -1,17 +1,20 @@
 const express = require("express");
 const fileUpload = require("express-fileupload");
 const cors = require("cors");
+const path = require("path");
 const issueService = require("./service/issueService");
 const reportService = require("./service/reportService");
 const workManageService = require("./service/workManageService");
 const dabadahubService = require("./service/dabadahubService");
+const dabadapushService = require("./service/dabadapushService");
 const { supabase, BUCKET_NAME } = require("./config/supabase");
 const app = express();
 
 app.use(fileUpload());
+app.use(express.json());
 
 // configuration =========================
-app.set("port", process.env.PORT || 3001);
+app.set("port", process.env.PORT || 7500);
 app.use(cors());
 
 // interceptor Function
@@ -27,6 +30,15 @@ app.get("/", (req, res) => {
     name: "Dabadahub API Server",
     version: "1.0.0",
     endpoints: {
+      "Push": [
+        { method: "GET", path: "/api/stream", description: "SSE 연결 (익스텐션)" },
+        { method: "POST", path: "/api/send-push", description: "실제 푸시 발송 (DB 저장 및 전송)" },
+        { method: "GET", path: "/api/push-list", description: "푸시 이력 목록 조회 (query: ip)" },
+        { method: "POST", path: "/api/read-push", description: "푸시 읽음 처리 (body: id, ip)" },
+        { method: "GET", path: "/api/push-message", description: "특정 푸시 상세 조회 (query: id, ip)" },
+        { method: "GET", path: "/api/test-push", description: "푸시 테스트 (query: ip, type, title, msg, actionUrl)" },
+        { method: "GET", path: "/push-popup", description: "푸시 팝업 HTML 페이지" },
+      ],
       "Issue": [
         { method: "POST", path: "/getIssueList/", description: "이슈 목록 조회" },
         { method: "POST", path: "/getIssueListCount/", description: "이슈 카운트 조회" },
@@ -309,6 +321,65 @@ app.get("/getStatistics/:data", logger, (req, res) => {
 // 다바다허브 연결 상태 체크
 app.get("/checkLinkAvailability", logger, (req, res) => {
   dabadahubService.checkLinkAvailability(req, res);
+});
+
+/* Push 서비스 API */
+
+// SSE 연결 엔드포인트
+app.get("/api/stream", (req, res) => {
+  dabadapushService.handleStream(req, res);
+});
+
+// 실제 푸시 발송 API
+app.post("/api/send-push", logger, async (req, res) => {
+  const { targetIp, type, title, message, actionUrl } = req.body;
+  if (!targetIp) return res.status(400).json({ success: false, message: "targetIp 파라미터가 필요합니다." });
+  const result = await dabadapushService.sendPush(targetIp, type, title, message, actionUrl);
+  res.json(result);
+});
+
+// 푸시 리스트 조회 API
+app.get("/api/push-list", logger, (req, res) => {
+  dabadapushService.getPushList(req, res);
+});
+
+// 푸시 읽음 처리 API
+app.post("/api/read-push", logger, (req, res) => {
+  dabadapushService.readPush(req, res);
+});
+
+// 특정 푸시 메시지 조회 API
+app.get("/api/push-message", logger, (req, res) => {
+  dabadapushService.getPushMessageById(req, res);
+});
+
+// 푸시 테스트 API (직접 호출 시 푸시 발송)
+app.get("/api/test-push", logger, async (req, res) => {
+  const targetIp = req.query.ip;
+  const type = req.query.type || "default";
+  const title = req.query.title || "테스트 알림";
+  const message = req.query.msg || "서버에서 보낸 테스트 메시지입니다.";
+  const actionUrl = req.query.actionUrl || "";
+  
+  if (!targetIp) {
+    return res.status(400).json({ success: false, message: "IP 파라미터가 필요합니다." });
+  }
+
+  const result = await dabadapushService.sendPush(targetIp, type, title, message, actionUrl);
+  res.json(result);
+});
+
+// 팝업 콘텐츠 서빙 (HTML 메인 프레임)
+app.get("/push-popup", (req, res) => {
+  res.sendFile(path.join(__dirname, "views", "push-popup.html"));
+});
+
+// 타입별 모달 템플릿 정적 서빙
+app.use("/templates", express.static(path.join(__dirname, "views", "templates")));
+
+// 팝업에서 호출할 데이터 조회 API (deprecated)
+app.get("/api/getPushPage", (req, res) => {
+  dabadapushService.getPushPageData(req, res);
 });
 
 // Listen - 로컬 환경에서만 포트 지정하여 실행
