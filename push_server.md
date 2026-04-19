@@ -47,7 +47,7 @@ app.get("/api/stream", (req, res) => {
 #### [POST] /api/send-push
 가장 권장되는 표준 푸시 발송 방식입니다. JSON 바디를 사용합니다.
 
-- **URL:** `http://localhost:3001/api/send-push`
+- **URL:** `http://localhost:7500/api/send-push`
 - **Method:** `POST`
 - **Content-Type:** `application/json`
 - **Payload:**
@@ -80,10 +80,10 @@ app.get("/api/stream", (req, res) => {
 
 ```bash
 # 한 줄로 작성된 표준 curl (추천)
-curl -X POST http://localhost:3001/api/send-push -H "Content-Type: application/json" -d "{\"targetIp\":\"127.0.0.1\",\"type\":\"hook\",\"title\":\"테스트 알림\",\"message\":\"메시지 내용입니다.\"}"
+curl -X POST http://localhost:7500/api/send-push -H "Content-Type: application/json" -d "{\"targetIp\":\"127.0.0.1\",\"type\":\"hook\",\"title\":\"테스트 알림\",\"message\":\"메시지 내용입니다.\"}"
 
 # jq를 사용하여 안전하게 전송하는 방법 (가독성 좋음)
-echo '{"targetIp":"127.0.0.1","type":"jenkins","title":"빌드완료","message":"성공적으로 빌드되었습니다."}' | curl -X POST http://localhost:3001/api/send-push -H "Content-Type: application/json" -d @-
+echo '{"targetIp":"127.0.0.1","type":"jenkins","title":"빌드완료","message":"성공적으로 빌드되었습니다."}' | curl -X POST http://localhost:7500/api/send-push -H "Content-Type: application/json" -d @-
 ```
 
 ### 5.2. GET 방식 테스트 (Query Parameter 사용)
@@ -94,15 +94,15 @@ echo '{"targetIp":"127.0.0.1","type":"jenkins","title":"빌드완료","message":
 
 ```bash
 # 브라우저 주소창 입력 예시
-http://localhost:3001/api/test-push?ip=127.0.0.1&type=hook&title=테스트&msg=안녕
+http://localhost:7500/api/test-push?ip=127.0.0.1&type=hook&title=테스트&msg=안녕
 
 # curl 사용 예시
-curl "http://localhost:3001/api/test-push?ip=127.0.0.1&type=jenkins&title=Build&msg=Success"
+curl "http://localhost:7500/api/test-push?ip=127.0.0.1&type=jenkins&title=Build&msg=Success"
 ```
 
 ---
 
 ## 6. 주의 사항
 - **파라미터명 주의**: `POST` 요청 시에는 `targetIp`와 `message`를 사용하고, `GET` 요청 시에는 `ip`와 `msg`를 사용합니다 (서버 코드 호환성 때문).
-- **네트워크 환경**: 서버의 `port`는 기본적으로 `3001`을 사용하며, 환경 변수 `PORT`로 변경 가능합니다.
+- **네트워크 환경**: 서버의 `port`는 기본적으로 `7500`을 사용하며, 환경 변수 `PORT`로 변경 가능합니다.
 - **연결 확인**: 서버 콘솔에 `[SSE Connected] IP: 127.0.0.1` 로그가 찍혀 있는지 확인 후 테스트를 진행하세요.
